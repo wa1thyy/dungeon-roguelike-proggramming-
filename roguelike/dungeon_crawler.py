@@ -1,14 +1,8 @@
-# =============================================================================
-#  DUNGEON CRAWLER — Roguelike with Directional Sprites & Shield Booster
-# =============================================================================
-
 import pygame
 import random
 import sys
 import os
 import math
-
-# ── CONSTANTS ─────────────────────────────────────────────────────────────────
 
 SCREEN_W, SCREEN_H = 800, 600
 CAPTION = "Dungeon Crawler"
@@ -37,18 +31,11 @@ GOLD_COUNT      = 10
 SHIELD_COUNT    = 2
 PLAYER_MAX_HP   = 5
 DAMAGE_COOLDOWN = 60
-SHIELD_DURATION = 300     # 5 seconds
+SHIELD_DURATION = 300
 MOVE_COOLDOWN   = 10
 SPRITE_SIZE     = 52
 
-
-# ── SPRITE LOADING ────────────────────────────────────────────────────────────
-
 def load_player_sprites():
-    """
-    Load player_front/back/left/right.png from the same folder as this script.
-    Returns: { "front": Surface, "back": Surface, "left": Surface, "right": Surface }
-    """
     base    = os.path.dirname(os.path.abspath(__file__))
     sprites = {}
     for direction in ("front", "back", "left", "right"):
@@ -57,15 +44,12 @@ def load_player_sprites():
             img = pygame.image.load(path).convert_alpha()
             img = pygame.transform.scale(img, (SPRITE_SIZE, SPRITE_SIZE))
         else:
-            # Fallback: coloured square
             img = pygame.Surface((SPRITE_SIZE, SPRITE_SIZE), pygame.SRCALPHA)
             img.fill((80, 140, 220))
         sprites[direction] = img
     return sprites
 
-
 def make_shield_tinted(sprites):
-    """Return a copy of every sprite with a blue tint for when shield is active."""
     tinted = {}
     for direction, img in sprites.items():
         t    = img.copy()
@@ -75,21 +59,10 @@ def make_shield_tinted(sprites):
         tinted[direction] = t
     return tinted
 
-
-# ── HELPERS ───────────────────────────────────────────────────────────────────
-
 def draw_rounded_rect(surface, colour, rect, radius=6):
     pygame.draw.rect(surface, colour, rect, border_radius=radius)
 
-
-# ── PLAYER ────────────────────────────────────────────────────────────────────
-
 class Player(pygame.sprite.Sprite):
-    """
-    Player sprite — switches between 4 directional images based on movement.
-    No multi-frame animation; the correct face direction is shown at all times.
-    """
-
     def __init__(self, col, row, sprites, tinted_sprites):
         super().__init__()
         self.sprites        = sprites
@@ -110,7 +83,6 @@ class Player(pygame.sprite.Sprite):
         self.move_timer    = 0
 
     def update(self, keys, walls):
-        # ── Read held keys ────────────────────────────────────────────────────
         dcol, drow   = 0, 0
         new_dir      = self.direction
 
@@ -125,7 +97,6 @@ class Player(pygame.sprite.Sprite):
 
         self.direction = new_dir
 
-        # ── Attempt tile step ─────────────────────────────────────────────────
         if self.move_timer > 0:
             self.move_timer -= 1
         elif dcol != 0 or drow != 0:
@@ -134,11 +105,9 @@ class Player(pygame.sprite.Sprite):
                 self.col, self.row = nc, nr
             self.move_timer = MOVE_COOLDOWN
 
-        # ── Pick sprite (normal or shield-tinted) ─────────────────────────────
         src        = self.tinted_sprites if self.shield_timer > 0 else self.sprites
         self.image = src[self.direction]
 
-        # ── Smooth pixel slide toward tile ────────────────────────────────────
         tx = float(self.col * TILE + (TILE - SPRITE_SIZE) // 2)
         ty = float(self.row * TILE + (TILE - SPRITE_SIZE) // 2)
         self.px += (tx - self.px) * 0.35
@@ -160,9 +129,6 @@ class Player(pygame.sprite.Sprite):
     @property
     def alive_flag(self):
         return self.hp > 0
-
-
-# ── ENEMY ─────────────────────────────────────────────────────────────────────
 
 class Enemy(pygame.sprite.Sprite):
     DIRS = [(0,-1),(0,1),(-1,0),(1,0)]
@@ -217,9 +183,6 @@ class Enemy(pygame.sprite.Sprite):
         self.py += (self.row*TILE+2 - self.py) * 0.25
         self.rect.topleft = (round(self.px), round(self.py))
 
-
-# ── GOLD ──────────────────────────────────────────────────────────────────────
-
 class Gold(pygame.sprite.Sprite):
     def __init__(self, col, row):
         super().__init__()
@@ -235,9 +198,6 @@ class Gold(pygame.sprite.Sprite):
         self.tick += 1
         self.rect.topleft = (self.col*TILE+2,
                              self.row*TILE+2 + int(math.sin(self.tick*0.1)*2))
-
-
-# ── SHIELD BOOSTER ────────────────────────────────────────────────────────────
 
 class ShieldBooster(pygame.sprite.Sprite):
     def __init__(self, col, row):
@@ -272,9 +232,6 @@ class ShieldBooster(pygame.sprite.Sprite):
         self.rect.topleft = (self.col*TILE+2,
                              self.row*TILE+2 + int(math.sin(self.tick*0.1)*2))
 
-
-# ── LEVEL GENERATION ──────────────────────────────────────────────────────────
-
 def generate_level():
     walls = set()
     for c in range(COLS): walls.add((c,0));       walls.add((c,ROWS-1))
@@ -297,9 +254,6 @@ def generate_level():
     for _ in range(min(SHIELD_COUNT, len(free))): c,r=free.pop(); shield_group.add(ShieldBooster(c,r))
     return walls, enemies, gold_group, shield_group
 
-
-# ── DRAWING ───────────────────────────────────────────────────────────────────
-
 def draw_dungeon(surface, walls):
     for r in range(ROWS):
         for c in range(COLS):
@@ -310,7 +264,6 @@ def draw_dungeon(surface, walls):
             else:
                 pygame.draw.rect(surface, C_FLOOR, rect)
                 pygame.draw.rect(surface, (50,45,65),  rect, 1)
-
 
 def draw_shield_aura(surface, player, tick):
     if player.shield_timer <= 0:
@@ -330,7 +283,6 @@ def draw_shield_aura(surface, player, tick):
                        ((SPRITE_SIZE+24)//2, (SPRITE_SIZE+24)//2), radius, 2)
     surface.blit(ring, (cx-(SPRITE_SIZE+24)//2, cy-(SPRITE_SIZE+24)//2))
 
-
 def draw_hud(surface, font_med, font_small, player, level, tick):
     pygame.draw.rect(surface, C_HUD_BG, (0, ROWS*TILE, SCREEN_W, 80))
     pygame.draw.line(surface, C_GRAY,   (0, ROWS*TILE), (SCREEN_W, ROWS*TILE), 2)
@@ -349,7 +301,6 @@ def draw_hud(surface, font_med, font_small, player, level, tick):
         "WASD/Arrows=move   Gold=+10pts   Blue shield=invincibility",
         True, C_GRAY), (10, ROWS*TILE+58))
 
-
 def draw_intro(surface, font_large, font_small):
     ov = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
     ov.fill((0,0,0,185)); surface.blit(ov,(0,0))
@@ -366,7 +317,6 @@ def draw_intro(surface, font_large, font_small):
     ]):
         txt = font_small.render(line, True, col)
         surface.blit(txt, txt.get_rect(center=(SCREEN_W//2, 250+i*34)))
-
 
 def draw_game_over(surface, font_large, font_med, font_small, player, level):
     ov = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
@@ -386,113 +336,4 @@ def draw_game_over(surface, font_large, font_med, font_small, player, level):
         surface.blit(lbl, lbl.get_rect(right=SCREEN_W//2-10, centery=y))
         surface.blit(val, val.get_rect(left=SCREEN_W//2+10,  centery=y))
     hint = font_small.render("Press  R  to Restart   or   ESC  to Quit", True, C_GRAY)
-    surface.blit(hint, hint.get_rect(center=(SCREEN_W//2, 430)))
-
-
-# ── MAIN ──────────────────────────────────────────────────────────────────────
-
-def main():
-    pygame.init()
-    screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
-    pygame.display.set_caption(CAPTION)
-    font_large = pygame.font.SysFont("consolas", 42, bold=True)
-    font_med   = pygame.font.SysFont("consolas", 22)
-    font_small = pygame.font.SysFont("consolas", 16)
-    clock      = pygame.time.Clock()
-    tick       = 0
-
-    player_sprites = load_player_sprites()
-    tinted_sprites = make_shield_tinted(player_sprites)
-
-    STATE_INTRO, STATE_PLAYING, STATE_GAMEOVER = "intro", "playing", "gameover"
-
-    walls, enemies, gold_group, shield_group = set(), \
-        pygame.sprite.Group(), pygame.sprite.Group(), pygame.sprite.Group()
-    player       = Player(2, 2, player_sprites, tinted_sprites)
-    player_group = pygame.sprite.GroupSingle(player)
-    level        = 1
-    state        = STATE_INTRO
-
-    def new_game():
-        nonlocal walls, enemies, gold_group, shield_group, player, level, state
-        level  = 1
-        walls, enemies, gold_group, shield_group = generate_level()
-        player = Player(2, 2, player_sprites, tinted_sprites)
-        player_group.add(player)
-        state  = STATE_PLAYING
-
-    running = True
-    while running:
-        tick += 1
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            if event.type == pygame.KEYDOWN:
-                if state == STATE_INTRO:
-                    if event.key in (pygame.K_SPACE, pygame.K_RETURN): new_game()
-                elif state == STATE_GAMEOVER:
-                    if   event.key == pygame.K_r:      new_game()
-                    elif event.key == pygame.K_ESCAPE: running = False
-                elif state == STATE_PLAYING:
-                    if event.key == pygame.K_ESCAPE:   running = False
-
-        if state == STATE_PLAYING:
-            keys = pygame.key.get_pressed()
-            player.update(keys, walls)
-            enemies.update(walls)
-            gold_group.update()
-            shield_group.update()
-
-            for _ in pygame.sprite.spritecollide(player, gold_group, True,
-                        collided=lambda p,g: (p.col,p.row)==(g.col,g.row)):
-                player.score += 10
-
-            if pygame.sprite.spritecollide(player, shield_group, True,
-                   collided=lambda p,s: (p.col,p.row)==(s.col,s.row)):
-                player.activate_shield()
-
-            if not gold_group:
-                level += 1
-                walls, enemies, gold_group, shield_group = generate_level()
-                player.col, player.row = 2, 2
-
-            if pygame.sprite.spritecollide(player, enemies, False,
-                   collided=lambda p,e: (p.col,p.row)==(e.col,e.row)):
-                player.take_damage()
-
-            if not player.alive_flag:
-                state = STATE_GAMEOVER
-
-        screen.fill(C_BG)
-
-        if state in (STATE_PLAYING, STATE_GAMEOVER):
-            draw_dungeon(screen, walls)
-            gold_group.draw(screen)
-            shield_group.draw(screen)
-            enemies.draw(screen)
-            draw_shield_aura(screen, player, tick)
-            show = (state == STATE_GAMEOVER
-                    or player.shield_timer > 0
-                    or player.damage_timer == 0
-                    or player.damage_timer % 8 < 4)
-            if show:
-                player_group.draw(screen)
-            draw_hud(screen, font_med, font_small, player, level, tick)
-
-        if state == STATE_INTRO:
-            draw_dungeon(screen, walls)
-            draw_intro(screen, font_large, font_small)
-
-        if state == STATE_GAMEOVER:
-            draw_game_over(screen, font_large, font_med, font_small, player, level)
-
-        pygame.display.flip()
-        clock.tick(FPS)
-
-    pygame.quit()
-    sys.exit()
-
-
-if __name__ == "__main__":
-    main()
+    surface.blit(hint, hint.get_rect(center=(SCREEN
