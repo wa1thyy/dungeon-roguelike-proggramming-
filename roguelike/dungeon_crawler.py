@@ -336,4 +336,109 @@ def draw_game_over(surface, font_large, font_med, font_small, player, level):
         surface.blit(lbl, lbl.get_rect(right=SCREEN_W//2-10, centery=y))
         surface.blit(val, val.get_rect(left=SCREEN_W//2+10,  centery=y))
     hint = font_small.render("Press  R  to Restart   or   ESC  to Quit", True, C_GRAY)
-    surface.blit(hint, hint.get_rect(center=(SCREEN
+    surface.blit(hint, hint.get_rect(center=(SCREEN_W//2, 430)))
+
+def main():
+    pygame.init()
+    screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
+    pygame.display.set_caption(CAPTION)
+    font_large = pygame.font.SysFont("consolas", 42, bold=True)
+    font_med   = pygame.font.SysFont("consolas", 22)
+    font_small = pygame.font.SysFont("consolas", 16)
+    clock      = pygame.time.Clock()
+    tick       = 0
+
+    player_sprites = load_player_sprites()
+    tinted_sprites = make_shield_tinted(player_sprites)
+
+    STATE_INTRO, STATE_PLAYING, STATE_GAMEOVER = "intro", "playing", "gameover"
+
+    walls, enemies, gold_group, shield_group = set(), \
+        pygame.sprite.Group(), pygame.sprite.Group(), pygame.sprite.Group()
+    player       = Player(2, 2, player_sprites, tinted_sprites)
+    player_group = pygame.sprite.GroupSingle(player)
+    level        = 1
+    state        = STATE_INTRO
+
+    def new_game():
+        nonlocal walls, enemies, gold_group, shield_group, player, level, state
+        level  = 1
+        walls, enemies, gold_group, shield_group = generate_level()
+        player = Player(2, 2, player_sprites, tinted_sprites)
+        player_group.add(player)
+        state  = STATE_PLAYING
+
+    running = True
+    while running:
+        tick += 1
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN:
+                if state == STATE_INTRO:
+                    if event.key in (pygame.K_SPACE, pygame.K_RETURN): new_game()
+                elif state == STATE_GAMEOVER:
+                    if   event.key == pygame.K_r:      new_game()
+                    elif event.key == pygame.K_ESCAPE: running = False
+                elif state == STATE_PLAYING:
+                    if event.key == pygame.K_ESCAPE:   running = False
+
+        if state == STATE_PLAYING:
+            keys = pygame.key.get_pressed()
+            player.update(keys, walls)
+            enemies.update(walls)
+            gold_group.update()
+            shield_group.update()
+
+            for _ in pygame.sprite.spritecollide(player, gold_group, True,
+                        collided=lambda p,g: (p.col,p.row)==(g.col,g.row)):
+                player.score += 10
+
+            if pygame.sprite.spritecollide(player, shield_group, True,
+                   collided=lambda p,s: (p.col,p.row)==(s.col,s.row)):
+                player.activate_shield()
+
+            if not gold_group:
+                level += 1
+                walls, enemies, gold_group, shield_group = generate_level()
+                player.col, player.row = 2, 2
+
+            if pygame.sprite.spritecollide(player, enemies, False,
+                   collided=lambda p,e: (p.col,p.row)==(e.col,e.row)):
+                player.take_damage()
+
+            if not player.alive_flag:
+                state = STATE_GAMEOVER
+
+        screen.fill(C_BG)
+
+        if state in (STATE_PLAYING, STATE_GAMEOVER):
+            draw_dungeon(screen, walls)
+            gold_group.draw(screen)
+            shield_group.draw(screen)
+            enemies.draw(screen)
+            draw_shield_aura(screen, player, tick)
+            show = (state == STATE_GAMEOVER
+                    or player.shield_timer > 0
+                    or player.damage_timer == 0
+                    or player.damage_timer % 8 < 4)
+            if show:
+                player_group.draw(screen)
+            draw_hud(screen, font_med, font_small, player, level, tick)
+
+        if state == STATE_INTRO:
+            draw_dungeon(screen, walls)
+            draw_intro(screen, font_large, font_small)
+
+        if state == STATE_GAMEOVER:
+            draw_game_over(screen, font_large, font_med, font_small, player, level)
+
+        pygame.display.flip()
+        clock.tick(FPS)
+
+    pygame.quit()
+    sys.exit()
+
+if __name__ == "__main__":
+    main()
